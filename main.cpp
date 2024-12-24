@@ -3,6 +3,7 @@
 #include <vector>
 #include <random>
 #include <conio.h>
+#include <chrono>
 
 using namespace std;
 
@@ -10,12 +11,17 @@ struct Random
 {
     Random(int min, int max)
         : mUniformDistribution(min, max)
-    {}
+    {
+        mEngine.seed(chrono::system_clock::now().time_since_epoch().count());
+    }
+
     int operator()()
     {
         return mUniformDistribution(mEngine);
     }
-    default_random_engine mEngine{ random_device()() };
+
+private:
+    default_random_engine mEngine;
     uniform_int_distribution<int> mUniformDistribution;
 };
 
@@ -34,9 +40,9 @@ int x = 4;
 bool gameover = false;
 size_t GAMESPEED = 20000;
 
-Random getRandom{ 0, 6 };
+Random getRandom(0,6);
 
-vector<vector<vector<int>>> block_list =
+vector<vector<vector<int>>> blockList =
 {
     {
         { 0, 1, 0, 0 },
@@ -174,7 +180,7 @@ bool makeBlocks()
         for (size_t j = 0; j < 4; j++)
         {
             block[i][j] = 0;
-            block[i][j] = block_list[blockType][i][j];
+            block[i][j] = blockList[blockType][i][j];
         }
     }
     for (size_t i = 0; i < 4; i++)
@@ -214,15 +220,46 @@ void moveBlock(int x2, int y2)
     display();
 }
 
+void burnLines() {
+    for (int i = 19; i >= 0; i--) {
+        bool fullLine = true;
+        for (int j = 1; j <= 10; j++) {
+            if (stage[i][j] == 0) {
+                fullLine = false;
+                break;
+            }
+        }
+
+        if (fullLine) {
+            for (int k = i; k > 0; k--) {
+                for (int j = 1; j <= 10; j++) {
+                    stage[k][j] = stage[k - 1][j];
+                }
+            }
+            for (int j = 1; j <= 10; j++) {
+                stage[0][j] = 0;
+            }
+        }
+    }
+
+    for (size_t i = 0; i < 21; i++) {
+        for (size_t j = 0; j < 12; j++) {
+            field[i][j] = stage[i][j];
+        }
+    }
+
+    display();
+}
+
 void collidable()
 {
-    for (size_t i = 0; i<21; i++)
-    {
-        for (size_t j = 0; j<12; j++)
-        {
+    for (size_t i = 0; i < 21; i++) {
+        for (size_t j = 0; j < 12; j++) {
             stage[i][j] = field[i][j];
         }
     }
+
+    burnLines();
 }
 
 bool isCollide(int x2, int y2)
