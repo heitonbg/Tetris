@@ -1,26 +1,32 @@
-#include <iomanip> // подключение библиотеки для управления форматированием ввода/вывода
+#include <iomanip>
 #include <iostream>
 #include <vector>
-#include <random> // подключение библиотеки для генерации случайных чисел
-#include <conio.h> // подключение библиотеки для работы с консольным вводом
+#include <random>
+#include <conio.h>
+#include <chrono>
 
 using namespace std;
 
 struct Random
 {
-    Random(int min, int max) // конструктор, принимающий минимальное и максимальное значения
-        : mUniformDistribution(min, max) // инициализация равномерного распределения
-    {}
-    int operator()() // перегрузка оператора () для генерации случайного числа
+    Random(int min, int max)
+        : mUniformDistribution(min, max)
     {
-        return mUniformDistribution(mEngine); // возвращает случайное число из заданного диапазона
+        mEngine.seed(chrono::system_clock::now().time_since_epoch().count());
     }
-    default_random_engine mEngine{ random_device()() }; // генератор случайных чисел
-    uniform_int_distribution<int> mUniformDistribution; // равномерное распределение для целых чисел
+
+    int operator()()
+    {
+        return mUniformDistribution(mEngine);
+    }
+
+private:
+    default_random_engine mEngine;
+    uniform_int_distribution<int> mUniformDistribution;
 };
 
-vector<vector<int>> stage(22, vector<int>(13, 0)); // игровая область
-vector<vector<int>> block = // текущий блок
+vector<vector<int>> stage(22, vector<int>(13, 0));
+vector<vector<int>> block =
 {
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 },
@@ -28,15 +34,15 @@ vector<vector<int>> block = // текущий блок
     { 0, 0, 0, 0 }
 };
 
-vector<vector<int>> field(22, vector<int>(13, 0)); // поле игры
-int y = 0; // вертикальная позиция блока
-int x = 4; // горизонтальная позиция блока
-bool gameover = false; // переменная окончания игры(флаг)
-size_t GAMESPEED = 20000; // скорость игры
+vector<vector<int>> field(22, vector<int>(13, 0));
+int y = 0;
+int x = 4;
+bool gameover = false;
+size_t GAMESPEED = 20000;
 
-Random getRandom{ 0, 6 }; // генератор случайных чисел для выбора типа блока
+Random getRandom(0,6);
 
-vector<vector<vector<int>>> block_list =
+vector<vector<vector<int>>> blockList =
 {
     {
         { 0, 1, 0, 0 },
@@ -80,251 +86,282 @@ vector<vector<vector<int>>> block_list =
         { 0, 0, 1, 0 },
         { 0, 0, 1, 0 }
     }
-}; //все возможные формы блоков
+};
 
-void gameLoop(); // основной игровой цикл
-void display(); // функция для отображения игрового поля
-bool makeBlocks(); // функция для создания нового блока
-void initGame(); // функция для инициализации игры
-void moveBlock(int, int); //функция для перемещения блока
-void collidable(); //функция для проверки коллизий
-bool isCollide(int, int); //функция для проверки столкновения
-void userInput(); //функция для обработки пользовательского ввода
-bool rotateBolck(); // функция для вращения блока
-void spawnBlock(); // функция для появления нового блока
+void gameLoop();
+void display();
+bool makeBlocks();
+void initGame();
+void moveBlock(int, int);
+void collidable();
+bool isCollide(int, int);
+void userInput();
+bool rotateBolck();
+void spawnBlock();
 
 void gameLoop()
 {
-    size_t time = 0; // переменная для отслеживания времени
-    initGame(); // инициализация игры
-    while (!gameover) //пока игра не окончена
+    size_t time = 0;
+    initGame();
+    while (!gameover)
     {
-        if (kbhit()) // если нажата клавиша
+        if (kbhit())
         {
-            userInput(); // обработка пользовательского ввода
+            userInput();
         }
 
-        if (time < GAMESPEED) //Если время меньше скорости игры
+        if (time < GAMESPEED)
         {
-            time++; //Увеличиваем время
+            time++;
         }
-        else //Если время превышает скорость игры
+        else
         {
-            spawnBlock(); //Появление нового блока
-            time = 0; //Сброс времени
+            spawnBlock();
+            time = 0;
         }
     }
 }
 
 void display()
 {
-    system("cls"); // Очистка консоли
-    for (size_t i = 0; i < 21; i++) // Проходим по строкам
+    system("cls");
+    for (size_t i = 0; i < 21; i++)
     {
-        for (size_t j = 0; j < 12; j++) //Проходим по колонкам
+        for (size_t j = 0; j < 12; j++)
         {
-            switch (field[i][j]) //Проверяем значение в поле
+            switch (field[i][j])
             {
-            case 0: //Если ячейка пустая
-                cout << " " << flush; // Печатаем пробел для пустой ячейки
+            case 0:
+                cout << " " << flush;
                 break;
-            case 9: //Если ячейка границы
-                cout << "@" << flush; // Печатаем символ '@' для границ
+            case 9:
+                cout << "@" << flush;
                 break;
-            default: // Если ячейка заполнена
-                cout << "#" << flush; // Печатаем '#' для заполненных ячеек
+            default:
+                cout << "#" << flush;
                 break;
             }
         }
-        cout << endl; //Переход на новую строку
+        cout << endl;
     }
-    if (gameover) // Если игра окончена
+    if (gameover)
     {
-        system("cls"); // Очистка консоли
+        system("cls");
     }
 }
 
 void initGame()
 {
-    for (size_t i = 0; i <= 20; i++) // Проходим по строкам
+    for (size_t i = 0; i <= 20; i++)
     {
-        for (size_t j = 0; j <= 11; j++) // Проходим по колонкам
+        for (size_t j = 0; j <= 11; j++)
         {
-            if ((j == 0) || (j == 11) || (i == 20)) //Если границы поля
+            if ((j == 0) || (j == 11) || (i == 20))
             {
-                field[i][j] = stage[i][j] = 9; //Устанавливаем границы
+                field[i][j] = stage[i][j] = 9;
             }
-            else // Если не граница
+            else
             {
-                field[i][j] = stage[i][j] = 0; //Устанавливаем пустые ячейки
+                field[i][j] = stage[i][j] = 0;
             }
         }
     }
-    makeBlocks(); // Создание первого блока
-    display(); //Отображение игрового поля
+    makeBlocks();
+    display();
 }
 
 bool makeBlocks()
 {
-    x = 4; //Установка начальной горизонтальной позиции блока
-    y = 0; //Установка начальной вертикальной позиции блока
-    int blockType = getRandom(); // Получение случайного типа блока
-    for (size_t i = 0; i < 4; i++) //Инициализация нового блока
+    x = 4;
+    y = 0;
+    int blockType = getRandom();
+    for (size_t i = 0; i < 4; i++)
     {
         for (size_t j = 0; j < 4; j++)
         {
-            block[i][j] = 0; // Обнуление текущего блока
-            block[i][j] = block_list[blockType][i][j]; // Копирование формы блока
+            block[i][j] = 0;
+            block[i][j] = blockList[blockType][i][j];
         }
     }
-    for (size_t i = 0; i < 4; i++) // Проверка на столкновения с новым блоком
+    for (size_t i = 0; i < 4; i++)
     {
         for (size_t j = 0; j < 4; j++)
         {
-            field[i][j + 4] = stage[i][j + 4] + block[i][j]; // Обновление поля с новым блоком
+            field[i][j + 4] = stage[i][j + 4] + block[i][j];
 
-            if (field[i][j + 4] > 1) // Если произошло столкновение
+            if (field[i][j + 4] > 1)
             {
-                gameover = true; // Устанавливаем флаг окончания игры
-                return true; // Возвращаем true для обозначения столкновения
+                gameover = true;
+                return true;
             }
         }
     }
-    return false; / Возвращаем false, если столкновения не произошло
+    return false;
 }
 
 void moveBlock(int x2, int y2)
 {
-    for (size_t i = 0; i < 4; i++) // Удаление блока из текущей позиции
+    for (size_t i = 0; i < 4; i++)
     {
         for (size_t j = 0; j < 4; j++)
         {
-            field[y + i][x + j] -= block[i][j]; //Убираем блок из поля
+            field[y + i][x + j] -= block[i][j];
         }
     }
-    x = x2; // Установка новой горизонтальной позиции
-    y = y2; // Установка новой вертикальной позиции
-    for (size_t i = 0; i < 4; i++) // Назначение блока на новую позицию
+    x = x2;
+    y = y2;
+    for (size_t i = 0; i < 4; i++)
     {
         for (size_t j = 0; j < 4; j++)
         {
-            field[y + i][x + j] += block[i][j]; // Установка блока на новое место
+            field[y + i][x + j] += block[i][j];
         }
     }
-    display(); // Обновление отображения
+    display();
+}
+
+void burnLines() {
+    for (int i = 19; i >= 0; i--) {
+        bool fullLine = true;
+        for (int j = 1; j <= 10; j++) {
+            if (stage[i][j] == 0) {
+                fullLine = false;
+                break;
+            }
+        }
+
+        if (fullLine) {
+            for (int k = i; k > 0; k--) {
+                for (int j = 1; j <= 10; j++) {
+                    stage[k][j] = stage[k - 1][j];
+                }
+            }
+            for (int j = 1; j <= 10; j++) {
+                stage[0][j] = 0;
+            }
+        }
+    }
+
+    for (size_t i = 0; i < 21; i++) {
+        for (size_t j = 0; j < 12; j++) {
+            field[i][j] = stage[i][j];
+        }
+    }
+
+    display();
 }
 
 void collidable()
 {
-    for (size_t i = 0; i < 21; i++) //Копируем текущее поле в стадию для проверки коллизий
-    {
-        for (size_t j = 0; j < 12; j++)
-        {
-            stage[i][j] = field[i][j]; //Копирование текущего состояния поля
+    for (size_t i = 0; i < 21; i++) {
+        for (size_t j = 0; j < 12; j++) {
+            stage[i][j] = field[i][j];
         }
     }
+
+    burnLines();
 }
 
 bool isCollide(int x2, int y2)
 {
-    for (size_t i = 0; i < 4; i++) //Проверка на столкновение с блоком
+    for (size_t i = 0; i < 4; i++)
     {
         for (size_t j = 0; j < 4; j++)
         {
-            if (block[i][j] && stage[y2 + i][x2 + j] != 0) // Если есть блок и нет пустоты
+            if (block[i][j] && stage[y2 + i][x2 + j] != 0)
             {
-                return true; // Возвращаем true, если произошло столкновение
+                return true;
             }
         }
     }
-    return false; // Возвращаем false, если столкновения не произошло
+    return false;
 }
 
 void userInput()
 {
-    char key; // Переменная для хранения нажатой клавиши
-    key = getch(); //Чтение нажатой клавиши
-    switch (key) //Обработка нажатой клавиши
+    char key;
+    key = getch();
+    switch (key)
     {
-    case 'd': //Если нажата d (вправо)
-        if (!isCollide(x + 1, y)) // Проверка на столкновение при движении вправо
+    case 'd':
+        if (!isCollide(x + 1, y))
         {
-            moveBlock(x + 1, y); // Перемещение блока вправо
+            moveBlock(x + 1, y);
         }
         break;
-    case 'a': // Если нажата a (влево)
-        if (!isCollide(x - 1, y)) // Проверка на столкновение при движении влево
+    case 'a':
+        if (!isCollide(x - 1, y))
         {
-            moveBlock(x - 1, y); // Перемещение блока влево
+            moveBlock(x - 1, y);
         }
         break;
-    case 's': // Если нажата s (вниз)
-        if (!isCollide(x, y + 1)) //Проверка на столкновение при движении вниз
+    case 's':
+        if (!isCollide(x, y + 1))
         {
-            moveBlock(x, y + 1); //Перемещение блока вниз
+            moveBlock(x, y + 1);
         }
         break;
-    case ' ': // Если нажата пробел (для вращения)
-        rotateBolck(); // Вращение блока
+    case ' ':
+        rotateBolck();
     }
 }
 
 bool rotateBolck()
 {
-    vector<vector<int>> tmp(4, vector<int>(4, 0)); //Временный вектор для хранения блока
-    for (size_t i = 0; i < 4; i++) // Сохранение текущего блока временно
+    vector<vector<int>> tmp(4, vector<int>(4, 0));
+    for (size_t i = 0; i < 4; i++)
     {
         for (size_t j = 0; j < 4; j++)
         {
             tmp[i][j] = block[i][j];
-                }
+        }
     }
-    for (size_t i = 0; i < 4; i++) //Вращение блока на 90 градусов по часовой стрелке
+    for (size_t i = 0; i < 4; i++)
     {
         for (size_t j = 0; j < 4; j++)
         {
-            block[i][j] = tmp[3 - j][i]; // Поворот блока
+            block[i][j] = tmp[3 - j][i];
         }
     }
-    if (isCollide(x, y)) //Проверка на столкновение после вращения
+    if (isCollide(x, y))
     {
-        for (size_t i = 0; i < 4; i++) //Если произошло столкновение, возвращаем блок в исходное состояние
+        for (size_t i = 0; i < 4; i++)
         {
             for (size_t j = 0; j < 4; j++)
             {
-                block[i][j] = tmp[i][j]; //Восстановление блока из временного вектора
+                block[i][j] = tmp[i][j];
             }
         }
-        return true; // Возвращаем true, если произошло столкновение
+        return true;
     }
-    for (size_t i = 0; i < 4; i++) //Обновление поля после успешного вращения
+    for (size_t i = 0; i < 4; i++)
     {
         for (size_t j = 0; j < 4; j++)
         {
-            field[y + i][x + j] -= tmp[i][j]; // Убираем временный блок из поля
-            field[y + i][x + j] += block[i][j]; // Добавляем новый (повернутый) блок в поле
+            field[y + i][x + j] -= tmp[i][j];
+            field[y + i][x + j] += block[i][j];
         }
     }
-    display(); // Обновление отображения
-    return false; //Возвращаем false, если столкновения не произошло
+    display();
+    return false;
 }
 
 void spawnBlock()
 {
-    if (!isCollide(x, y + 1)) //Проверка на возможность перемещения блока вниз
+    if (!isCollide(x, y + 1))
     {
-        moveBlock(x, y + 1); // Перемещение блока вниз
+        moveBlock(x, y + 1);
     }
-    else // Если блок не может двигаться вниз
+    else
     {
-        collidable(); //Обновление стадии с текущими блоками
-        makeBlocks(); //Создание нового блока
-        display(); // Обновление отображения
+        collidable();
+        makeBlocks();
+        display();
     }
 }
 
 int main()
 {
-    gameLoop(); // Запуск основного игрового цикла
+    gameLoop();
     return 0;
 }
